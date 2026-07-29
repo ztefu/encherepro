@@ -66,10 +66,7 @@ export function Hero() {
     return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   });
 
-  const [reservations, setReservations] = useState(() => {
-    const hoursPassed = Math.floor((new Date().getTime() - BASE_DATE) / (1000 * 60 * 60));
-    return 100 + (hoursPassed > 0 ? hoursPassed : 0) + realParticipantsCount;
-  });
+  const [reservations, setReservations] = useState(realParticipantsCount);
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [activeAvatars, setActiveAvatars] = useState(ALL_AVATARS.slice(0, 6));
@@ -100,9 +97,8 @@ export function Hero() {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
 
-      // 2. Reservations update: Base 100 + 1 per hour since creation + real participants
-      const hoursPassed = Math.floor((now - BASE_DATE) / (1000 * 60 * 60));
-      setReservations(100 + (hoursPassed > 0 ? hoursPassed : 0) + realParticipantsCount);
+      // 2. Reservations update: Real participants
+      setReservations(realParticipantsCount);
     };
 
     updateDynamicData(); // Initialize immediately
@@ -144,7 +140,7 @@ export function Hero() {
   }, [reservations]);
 
   return (
-    <section className="relative h-[100dvh] min-h-[600px] flex flex-col justify-center pt-16 pb-4 overflow-hidden bg-background">
+    <section className="relative min-h-[100dvh] flex flex-col justify-center pt-20 pb-10 overflow-x-hidden bg-background">
       {/* Background Slider */}
       <AnimatePresence mode="popLayout">
         <motion.div
