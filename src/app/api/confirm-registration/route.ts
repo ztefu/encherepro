@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       payment_status: "paid",
       participation_status: "registered",
       sale_id: participantData.saleId
-    }).select().single();
+    });
 
     if (error) {
       console.error('Error inserting participant:', error);
