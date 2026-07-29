@@ -44,6 +44,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
 
+    // 3. Increment the participants count on the sale using admin privileges
+    try {
+      const { createClient: createAdminClient } = require('@supabase/supabase-js');
+      const supabaseAdmin = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      
+      const { data: sale } = await supabaseAdmin.from('sales').select('participants').eq('id', participantData.saleId).single();
+      if (sale) {
+        await supabaseAdmin.from('sales').update({ participants: (sale.participants || 0) + 1 }).eq('id', participantData.saleId);
+      }
+    } catch (countError) {
+      console.error('Error incrementing participants count:', countError);
+    }
+
     return NextResponse.json({ success: true, participant: data });
   } catch (error: any) {
     console.error('Error confirming registration:', error);

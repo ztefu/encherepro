@@ -34,7 +34,7 @@ export function Hero() {
   
   const BASE_DATE = nextSale?.createdAt ? new Date(nextSale.createdAt).getTime() : SALE_CONFIG.BASE_DATE;
 
-  const realParticipantsCount = nextSale ? participants.filter(p => String(p.saleId) === String(nextSale.id)).length : 0;
+  const realParticipantsCount = nextSale ? (nextSale.participants || 0) : 0;
 
   const ALL_AVATARS = [
     "https://randomuser.me/api/portraits/men/32.jpg",
