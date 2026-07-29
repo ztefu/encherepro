@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ShieldCheck, CreditCard, Lock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ShieldCheck, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +11,98 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import "react-phone-number-input/style.css";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/context/AdminContext";
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// Initialisation de Stripe en dehors du composant
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+// Sous-composant de formulaire de paiement Stripe
+function CheckoutForm({ clientSecret, participantData, onSuccess, onBack }: any) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+    setErrorMessage("");
+
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setErrorMessage(submitError.message || "Erreur de formulaire");
+      setIsProcessing(false);
+      return;
+    }
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      clientSecret,
+      confirmParams: {
+        return_url: window.location.origin, // Non utilisé strictement avec redirect: if_required
+      },
+      redirect: 'if_required'
+    });
+
+    if (error) {
+      setErrorMessage(error.message || "Une erreur est survenue lors du paiement.");
+      setIsProcessing(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      // Paiement réussi, on confirme l'inscription côté serveur
+      try {
+        const res = await fetch('/api/confirm-registration', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId: paymentIntent.id,
+            participantData,
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          onSuccess();
+        } else {
+          setErrorMessage(data.error || "Erreur lors de l'enregistrement de l'inscription.");
+          setIsProcessing(false);
+        }
+      } catch (err) {
+         setErrorMessage("Erreur serveur lors de la confirmation.");
+         setIsProcessing(false);
+      }
+    } else {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PaymentElement />
+      {errorMessage && <div className="text-red-500 text-sm font-medium">{errorMessage}</div>}
+      <div className="pt-6 flex gap-4">
+        <Button type="button" variant="outline" size="lg" onClick={onBack} disabled={isProcessing}>
+          Retour
+        </Button>
+        <Button type="submit" size="lg" className="flex-1 text-lg gap-2 font-bold" disabled={!stripe || isProcessing}>
+          {isProcessing ? "Traitement en cours..." : (
+            <>
+              <Lock className="w-5 h-5" /> Payer 25,00 €
+            </>
+          )}
+        </Button>
+      </div>
+      <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground mt-4">
+        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+        Paiement 100% sécurisé via Stripe
+      </div>
+    </form>
+  );
+}
+
 
 export default function InscriptionPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -30,13 +119,21 @@ export default function InscriptionPage() {
   const [postalCode, setPostalCode] = useState("");
   const [city, setCity] = useState("");
   
+  // Stripe state
+  const [clientSecret, setClientSecret] = useState("");
+
   // For Supabase
   const supabase = createClient();
   const { sales } = useAdmin();
 
-  // Find upcoming sale to verify status
-  const upcomingSale = sales.find(s => s.status !== "finished") || sales[0];
-  const isRegistrationOpen = upcomingSale?.status === "open";
+  // Use the exact same logic as Hero.tsx to find the correct sale
+  const upcomingSales = sales
+    .filter(s => s.status === "En cours" || s.status === "open")
+    .sort((a, b) => new Date(a.isoDate).getTime() - new Date(b.isoDate).getTime());
+    
+  const openSale = upcomingSales[0];
+  const upcomingSale = openSale || sales.find(s => s.status !== "finished") || sales[0];
+  const isRegistrationOpen = upcomingSale?.status === "open" || upcomingSale?.status === "En cours";
 
   const handleNextStep = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,47 +150,40 @@ export default function InscriptionPage() {
       .eq('email', email)
       .eq('sale_id', upcomingSale?.id)
       .maybeSingle();
-    setIsProcessing(false);
 
     if (existingParticipant) {
       alert("Cette adresse email est déjà inscrite pour cette vente !");
+      setIsProcessing(false);
       return;
     }
 
-    setStep(2);
-  };
-
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    
-    // Insertion dans Supabase
-    const { error } = await supabase.from('participants').insert({
-      first_name: firstName,
-      last_name: lastName,
-      email: email,
-      phone: phoneInput,
-      country: "France", // default for now, could be derived from phone
-      address: address,
-      city: city,
-      postal_code: postalCode,
-      payment_status: "paid",
-      participation_status: "registered",
-      sale_id: upcomingSale?.id
-    });
-
-    setIsProcessing(false);
-    if (!error) {
-      setStep(3);
-    } else {
-      alert("Une erreur est survenue lors de l'enregistrement de votre inscription.");
-      console.error(error);
+    // Appeler l'API pour créer le PaymentIntent
+    try {
+      const res = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          saleId: upcomingSale?.id,
+          email: email
+        })
+      });
+      const data = await res.json();
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret);
+        setStep(2);
+      } else {
+        alert(data.error || "Erreur lors de l'initialisation du paiement.");
+      }
+    } catch (err) {
+      alert("Erreur serveur de paiement.");
     }
+    
+    setIsProcessing(false);
   };
 
   return (
     <div className="min-h-screen bg-background relative flex flex-col justify-center py-12">
-      {/* Background Decor (Optional) */}
+      {/* Background Decor */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-fixed opacity-10 blur-sm"
         style={{ backgroundImage: "url('/lots/abstract_luxury.png')" }} 
@@ -101,7 +191,7 @@ export default function InscriptionPage() {
       
       <div className="container relative z-10 max-w-3xl mx-auto px-4">
         
-        {/* En-tête (Logo et Retour) */}
+        {/* En-tête */}
         <div className="flex items-center justify-between mb-8">
           <Link href="/">
             <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
@@ -112,8 +202,6 @@ export default function InscriptionPage() {
             Enchère<span className="text-primary">Pro</span>
           </div>
         </div>
-
-
 
         {!isRegistrationOpen ? (
           <Card className="bg-card/60 backdrop-blur-md border-border/50 text-center py-16">
@@ -166,7 +254,7 @@ export default function InscriptionPage() {
                   Inscription à la vente
                 </h1>
                 <p className="text-muted-foreground mt-2">
-                  Vente Exceptionnelle : Collection Immobilière Prestige
+                  Vente Exceptionnelle : {upcomingSale?.title || "Prochaine vente"}
                 </p>
               </div>
 
@@ -244,7 +332,7 @@ export default function InscriptionPage() {
             </CardContent>
           )}
 
-          {/* ETAPE 2 : Paiement (Simulation) */}
+          {/* ETAPE 2 : Paiement (Stripe) */}
           {step === 2 && (
             <CardContent className="p-6 sm:p-10">
               <div className="mb-8 text-center">
@@ -252,7 +340,7 @@ export default function InscriptionPage() {
                   Frais d'inscription
                 </h1>
                 <p className="text-muted-foreground mt-2">
-                  Validation de votre participation à la vente
+                  Validation sécurisée de votre participation
                 </p>
               </div>
 
@@ -272,40 +360,22 @@ export default function InscriptionPage() {
                 </div>
               </div>
 
-              <form onSubmit={handlePayment} className="space-y-6">
-                
-                {/* Fausses informations de carte bancaire */}
-                <div className="space-y-4">
-                  <Label>Informations de paiement (Simulation)</Label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                    <Input disabled value="**** **** **** 4242" className="pl-10 bg-muted/50" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input disabled value="12/28" className="bg-muted/50" />
-                    <Input disabled value="123" className="bg-muted/50" />
-                  </div>
+              {clientSecret ? (
+                <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe', variables: { colorPrimary: '#d4af37' } } }}>
+                  <CheckoutForm 
+                    clientSecret={clientSecret}
+                    participantData={{
+                      firstName, lastName, email, phone: phoneInput, address, city, postalCode, saleId: upcomingSale?.id
+                    }}
+                    onSuccess={() => setStep(3)}
+                    onBack={() => setStep(1)}
+                  />
+                </Elements>
+              ) : (
+                <div className="flex justify-center items-center py-12">
+                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-
-                <div className="pt-6 flex gap-4">
-                  <Button type="button" variant="outline" size="lg" onClick={() => setStep(1)}>
-                    Retour
-                  </Button>
-                  <Button type="submit" size="lg" className="w-full text-lg gap-2" disabled={isProcessing}>
-                    {isProcessing ? (
-                      "Traitement..."
-                    ) : (
-                      <>
-                        <Lock className="w-5 h-5" /> Payer 25,00 €
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <div className="flex justify-center items-center gap-2 text-xs text-muted-foreground mt-4">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  Paiement fictif 100% sécurisé (Simulation Stripe)
-                </div>
-              </form>
+              )}
             </CardContent>
           )}
 
@@ -320,7 +390,7 @@ export default function InscriptionPage() {
               </h1>
               <div className="max-w-md mx-auto text-muted-foreground space-y-4">
                 <p>
-                  Félicitations, vos informations personnelles et votre paiement de 25,00 € ont bien été enregistrés.
+                  Félicitations, vos informations personnelles et votre paiement ont bien été enregistrés.
                 </p>
                 <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg text-foreground font-medium">
                   Nous vous contacterons par email ou téléphone au moment venu pour vous transmettre vos identifiants d'accès sécurisés à la salle de vente.
