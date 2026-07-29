@@ -66,7 +66,8 @@ export function Hero() {
     return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   });
 
-  const [reservations, setReservations] = useState(realParticipantsCount);
+  // Initialisation stable pour éviter le "Hydration Mismatch" de React sur mobile
+  const [reservations, setReservations] = useState(100 + realParticipantsCount);
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [activeAvatars, setActiveAvatars] = useState(ALL_AVATARS.slice(0, 6));
@@ -97,8 +98,9 @@ export function Hero() {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
 
-      // 2. Reservations update: Real participants
-      setReservations(realParticipantsCount);
+      // 2. Reservations update: Base 100 + 1 per hour since creation + real participants
+      const hoursPassed = Math.floor((now - BASE_DATE) / (1000 * 60 * 60));
+      setReservations(100 + (hoursPassed > 0 ? hoursPassed : 0) + realParticipantsCount);
     };
 
     updateDynamicData(); // Initialize immediately
