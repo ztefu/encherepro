@@ -26,7 +26,7 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const resolvedParams = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { participants, deleteParticipant, updateParticipantPayment, registrationFee, updateParticipantProfile } = useAdmin();
+  const { participants, sales, deleteParticipant, updateParticipantPayment, updateParticipantAccess, registrationFee, updateParticipantProfile } = useAdmin();
   const participantId = resolvedParams.id.slice(-36);
   const contextParticipant = participants.find(p => String(p.id) === participantId);
 
@@ -49,6 +49,11 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
   const [editAddress, setEditAddress] = useState(contextParticipant?.address || "");
   const [editPostalCode, setEditPostalCode] = useState(contextParticipant?.postalCode || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingTicket, setIsSendingTicket] = useState(false);
+  
+  // Custom alert modal state
+  const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+  const [resultModalMessage, setResultModalMessage] = useState({ title: "", description: "", isError: false });
 
   if (!contextParticipant) {
     return <div className="p-8 text-center text-muted-foreground">Participant introuvable.</div>;
@@ -101,6 +106,58 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
 
   const handleDownloadInvoice = () => {
     window.print();
+  };
+
+  const handleSendTicket = async () => {
+    setIsSendingTicket(true);
+    try {
+      const sale = sales.find(s => String(s.id) === String(participant.saleId));
+      let formattedDate = "Date à venir";
+      if (sale && sale.isoDate) {
+        formattedDate = format(new Date(sale.isoDate), "EEEE d MMMM yyyy 'à' HH'h'mm", { locale: fr });
+        // Capitalize first letter
+        formattedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+      }
+
+      const res = await fetch('/api/emails/send-ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: participant.email,
+          firstName: participant.firstName,
+          lastName: participant.lastName,
+          saleTitle: participant.sale,
+          saleDate: formattedDate,
+          saleLocation: sale?.location || "Adresse communiquée ultérieurement",
+        })
+      });
+      
+      if (res.ok) {
+        // Met à jour la DB via le contexte
+        updateParticipantAccess(participant.id, "access_sent");
+        setResultModalMessage({
+          title: "Succès !",
+          description: "Le billet d'accès a été envoyé au participant avec succès.",
+          isError: false
+        });
+        setIsResultModalOpen(true);
+      } else {
+        setResultModalMessage({
+          title: "Échec de l'envoi",
+          description: "Une erreur est survenue lors de l'envoi de l'email via Resend. Avez-vous configuré et vérifié votre domaine ou email d'expédition dans Resend ?",
+          isError: true
+        });
+        setIsResultModalOpen(true);
+      }
+    } catch (err) {
+      setResultModalMessage({
+        title: "Erreur réseau",
+        description: "Impossible de contacter le serveur d'envoi d'email.",
+        isError: true
+      });
+      setIsResultModalOpen(true);
+    }
+    setIsSendingTicket(false);
   };
 
   return (
@@ -266,8 +323,17 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
               <p className="text-sm text-muted-foreground">
                 Gérez les accès sécurisés à la plateforme de vente (ou le billet d'entrée).
               </p>
-              <Button className="w-full gap-2 justify-start bg-blue-600 hover:bg-blue-700">
-                <Mail className="w-4 h-4" /> Envoyer (ou renvoyer) les accès
+              <Button 
+                className="w-full gap-2 justify-start bg-blue-600 hover:bg-blue-700"
+                onClick={handleSendTicket}
+                disabled={isSendingTicket}
+              >
+                {isSendingTicket ? (
+                  <span className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white rounded-full" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                {isSendingTicket ? "Envoi en cours..." : "Envoyer (ou renvoyer) les accès"}
               </Button>
             </CardContent>
           </Card>
@@ -345,6 +411,30 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Result Alert Dialog */}
+      <Dialog open={isResultModalOpen} onOpenChange={setIsResultModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              {resultModalMessage.isError ? (
+                <ShieldCheck className="w-5 h-5 text-red-500" />
+              ) : (
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              )}
+              {resultModalMessage.title}
+            </DialogTitle>
+            <DialogDescription className="pt-4 pb-2">
+              {resultModalMessage.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setIsResultModalOpen(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

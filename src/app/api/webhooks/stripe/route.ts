@@ -63,14 +63,29 @@ export async function POST(req: Request) {
         // Do not return 500, otherwise Stripe will retry constantly for a DB constraint error
       }
 
-      // 2. Increment participants count on the sale
+      // 2. Increment participants count and send email receipt
       try {
-        const { data: sale } = await supabaseAdmin.from('sales').select('participants').eq('id', metadata.saleId).single();
+        const { data: sale } = await supabaseAdmin.from('sales').select('title, participants').eq('id', metadata.saleId).single();
         if (sale) {
           await supabaseAdmin.from('sales').update({ participants: (sale.participants || 0) + 1 }).eq('id', metadata.saleId);
+          
+          // Call the send-receipt API
+          const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+          const hostHeader = (await headers()).get('host') || 'localhost:3000';
+          await fetch(`${protocol}://${hostHeader}/api/emails/send-receipt`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: metadata.email,
+              firstName: metadata.firstName,
+              lastName: metadata.lastName,
+              saleTitle: sale.title,
+              amount: paymentIntent.amount / 100 // Convert cents to eur
+            })
+          });
         }
       } catch (countError) {
-        console.error('Error incrementing participants count in webhook:', countError);
+        console.error('Error incrementing participants count or sending receipt:', countError);
       }
     }
 
