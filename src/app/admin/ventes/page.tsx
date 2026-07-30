@@ -5,6 +5,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,8 +42,8 @@ import { useAdmin, Sale, SaleStatus } from "@/context/AdminContext";
 
 
 
-export default function SalesListPage() {
-  const { sales, addSale, deleteSale, deleteMultipleSales, duplicateSale, registrationFee, lots, participants } = useAdmin();
+export default function VentesPage() {
+  const { sales, addSale, deleteSale, deleteMultipleSales, duplicateSale, registrationFee, lots, participants, isLoading } = useAdmin();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -278,7 +280,25 @@ export default function SalesListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {filteredSales.map((sale) => (
+                {isLoading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-4" /></td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="w-12 h-12 rounded-lg" />
+                          <Skeleton className="h-5 w-48" />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-6 w-24 rounded-full" /></td>
+                      <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-8 ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : filteredSales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-muted/30 transition-colors" data-state={selectedSaleIds.includes(sale.id) ? "selected" : undefined}>
                     <td className="px-6 py-4">
                       <Checkbox 
@@ -339,7 +359,7 @@ export default function SalesListPage() {
                   </tr>
                 ))}
                 
-                {filteredSales.length === 0 && (
+                {!isLoading && filteredSales.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                       Aucune vente trouvée avec ces filtres.

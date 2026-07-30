@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/shared/Logo";
 
 import { use, useState, useEffect } from "react";
 import { useAdmin } from "@/context/AdminContext";
@@ -352,8 +353,8 @@ export default function ParticipantDetailPage({ params }: { params: Promise<{ id
     <div className="hidden print:block print-receipt">
       <div className="border-b-2 border-black pb-6 mb-8 flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-bold font-heading uppercase tracking-tight">Reçu de Paiement</h1>
-          <p className="text-gray-500 mt-2">EnchèrePro - Ventes Privées</p>
+          <h1 className="text-4xl font-bold font-heading uppercase tracking-tight mb-4">Reçu de Paiement</h1>
+          <Logo variant="dark" />
         </div>
         <div className="text-right">
           <p className="font-bold text-xl">N° {participant.id.toString().substring(0, 8).toUpperCase()}</p>

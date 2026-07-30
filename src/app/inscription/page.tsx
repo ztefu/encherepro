@@ -11,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Logo } from "@/components/shared/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { useAdmin } from "@/context/AdminContext";
 import { loadStripe } from '@stripe/stripe-js';
@@ -53,27 +55,8 @@ function CheckoutForm({ clientSecret, participantData, onSuccess, onBack }: any)
       setErrorMessage(error.message || "Une erreur est survenue lors du paiement.");
       setIsProcessing(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-      // Paiement réussi, on confirme l'inscription côté serveur
-      try {
-        const res = await fetch('/api/confirm-registration', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            paymentIntentId: paymentIntent.id,
-            participantData,
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          onSuccess();
-        } else {
-          setErrorMessage(data.error || "Erreur lors de l'enregistrement de l'inscription.");
-          setIsProcessing(false);
-        }
-      } catch (err) {
-         setErrorMessage("Erreur serveur lors de la confirmation.");
-         setIsProcessing(false);
-      }
+      // Paiement réussi, le Webhook Stripe gérera l'insertion en base de données.
+      onSuccess();
     } else {
       setIsProcessing(false);
     }
@@ -124,7 +107,7 @@ export default function InscriptionPage() {
 
   // For Supabase
   const supabase = createClient();
-  const { sales } = useAdmin();
+  const { sales, isLoading } = useAdmin();
 
   // Use the exact same logic as Hero.tsx to find the correct sale
   const upcomingSales = sales
@@ -164,7 +147,14 @@ export default function InscriptionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           saleId: upcomingSale?.id,
-          email: email
+          email,
+          firstName,
+          lastName,
+          phone: phoneInput,
+          country: "France", // Mettre à jour avec un champ pays si ajouté plus tard
+          address,
+          city,
+          postalCode
         })
       });
       const data = await res.json();
@@ -198,12 +188,20 @@ export default function InscriptionPage() {
               <ArrowLeft className="w-4 h-4" /> Retour à l'accueil
             </Button>
           </Link>
-          <div className="font-heading font-bold text-2xl tracking-tight text-foreground">
-            Enchère<span className="text-primary">Pro</span>
-          </div>
+          <Logo />
         </div>
 
-        {!isRegistrationOpen ? (
+        {isLoading ? (
+          <Card className="bg-card/60 backdrop-blur-md border-border/50 py-16">
+            <CardContent className="flex flex-col items-center justify-center space-y-4">
+              <Skeleton className="w-12 h-12 rounded-full mb-2" />
+              <Skeleton className="h-8 w-3/4 max-w-sm mb-2" />
+              <Skeleton className="h-4 w-full max-w-md" />
+              <Skeleton className="h-4 w-5/6 max-w-md mb-4" />
+              <Skeleton className="h-10 w-48 rounded-md" />
+            </CardContent>
+          </Card>
+        ) : !isRegistrationOpen ? (
           <Card className="bg-card/60 backdrop-blur-md border-border/50 text-center py-16">
             <CardContent className="flex flex-col items-center">
               <Lock className="w-12 h-12 text-muted-foreground mb-4" />

@@ -4,17 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ShieldCheck, Lock, Car, Home, Watch, Smartphone, Landmark, Sparkles, Gem } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { SALE_CONFIG } from "@/config/sale";
 import { useAdmin } from "@/context/AdminContext";
 
 const CATEGORIES = [
-  { id: 1, label: "Art Contemporain", title: "Enchères d'Art Contemporain", desc: "La salle des ventes s'anime pour les enchères des œuvres d'art maîtresses de notre époque.", icon: <Sparkles className="w-4 h-4 text-yellow-400" />, image: "/lots/art_auction.png" },
-  { id: 2, label: "Maisons", title: "Immobilier d'Exception", desc: "Misez sur des propriétés exclusives, prêtes à trouver leur nouveau propriétaire dès aujourd'hui.", icon: <Home className="w-4 h-4 text-emerald-400" />, image: "/lots/house_sale.png" },
-  { id: 3, label: "Horlogeries", title: "Garde-Temps de Prestige", desc: "Participez à la vente des montres mécaniques les plus rares, sous l'œil attentif de nos experts.", icon: <Watch className="w-4 h-4 text-purple-400" />, image: "/lots/watch_auction.png" },
-  { id: 4, label: "Antiquités", title: "Héritage et Antiquités", desc: "Des meubles et pièces de collection chargées d'histoire, disputées par les plus grands connaisseurs.", icon: <Landmark className="w-4 h-4 text-indigo-400" />, image: "/lots/antiques_auction.png" },
-  { id: 5, label: "Automobiles", title: "Automobiles de Collection", desc: "Notre grand hangar ouvre ses portes pour la vente aux enchères des supercars les plus convoitées.", icon: <Car className="w-4 h-4 text-blue-400" />, image: "/lots/car_auction.png" },
-  { id: 6, label: "Bijoux", title: "Haute Joaillerie", desc: "La salle s'illumine pour la mise aux enchères de créations joaillières et de diamants inestimables.", icon: <Gem className="w-4 h-4 text-orange-400" />, image: "/lots/jewelry_auction.png" },
+  { id: 1, label: "Art Contemporain", title: "Enchères d'Art Contemporain", desc: "Plongez dans l'univers de l'art contemporain et enchérissez sur des œuvres maîtresses uniques.", icon: <Sparkles className="w-4 h-4 text-yellow-400" />, image: "/lots/art_auction.png" },
+  { id: 2, label: "Maisons", title: "Immobilier d'Exception", desc: "Misez sur des propriétés exclusives et prestigieuses prêtes à trouver leur nouveau propriétaire.", icon: <Home className="w-4 h-4 text-emerald-400" />, image: "/lots/house_sale.png" },
+  { id: 3, label: "Horlogeries", title: "Garde-Temps de Prestige", desc: "Participez à la vente des montres mécaniques les plus rares, certifiées par nos grands experts.", icon: <Watch className="w-4 h-4 text-purple-400" />, image: "/lots/watch_auction.png" },
+  { id: 4, label: "Antiquités", title: "Héritage et Antiquités", desc: "Acquérez des pièces de collection chargées d'histoire, âprement disputées par les connaisseurs.", icon: <Landmark className="w-4 h-4 text-indigo-400" />, image: "/lots/antiques_auction.png" },
+  { id: 5, label: "Automobiles", title: "Automobiles de Collection", desc: "Notre hangar ouvre ses portes pour la vente aux enchères des supercars les plus exceptionnelles.", icon: <Car className="w-4 h-4 text-blue-400" />, image: "/lots/car_auction.png" },
+  { id: 6, label: "Bijoux", title: "Haute Joaillerie", desc: "La salle s'illumine pour la mise aux enchères de créations joaillières d'une valeur inestimable.", icon: <Gem className="w-4 h-4 text-orange-400" />, image: "/lots/jewelry_auction.png" },
 ];
 
 export function Hero() {
@@ -168,11 +169,17 @@ export function Hero() {
           transition={{ duration: 0.8 }}
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-card/95 text-primary text-xs sm:text-sm font-semibold mb-6 shadow-lg backdrop-blur-md"
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-          </span>
-          Prochaine vente le {displayDate}.
+          {isLoading ? (
+            <Skeleton className="h-4 w-40 bg-primary/20 rounded-full" />
+          ) : (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+              Prochaine vente le {displayDate}.
+            </>
+          )}
         </motion.div>
 
         {/* Dynamic Title & Desc */}
@@ -186,11 +193,11 @@ export function Hero() {
               transition={{ duration: 0.5 }}
               className="flex flex-col items-center w-full px-2"
             >
-              <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-2 max-w-4xl text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-2 max-w-4xl text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] min-h-[72px] sm:min-h-0 flex items-center justify-center text-center">
                 {CATEGORIES[currentIndex].title}
               </h1>
 
-              <p className="text-sm sm:text-base text-white/90 max-w-2xl leading-relaxed font-medium drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+              <p className="text-sm sm:text-base text-white/90 max-w-2xl leading-relaxed font-medium drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] min-h-[40px] sm:min-h-[48px] flex items-center justify-center text-center">
                 {CATEGORIES[currentIndex].desc}
               </p>
             </motion.div>
@@ -209,10 +216,10 @@ export function Hero() {
             <button
               key={cat.id}
               onClick={() => setCurrentIndex(idx)}
-              className={`shrink-0 snap-start flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 ${idx === currentIndex
+              className={`shrink-0 snap-start flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border transition-all duration-300 ${idx === currentIndex
                 ? "bg-primary/20 border-primary/50 text-white shadow-[0_0_15px_rgba(var(--primary),0.3)] font-semibold"
                 : "bg-black/40 border-white/10 text-white/70 hover:bg-black/60 hover:text-white"
-                } backdrop-blur-md text-sm`}
+                } backdrop-blur-md text-xs sm:text-sm`}
             >
               {cat.icon}
               <span>{cat.label}</span>
@@ -231,12 +238,21 @@ export function Hero() {
             <ShieldCheck className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <p className="text-white font-semibold text-base leading-tight mb-0.5">
-              <span className="text-primary">{Math.max(0, registrationFee - 5)}€ remboursés</span> si aucun achat
-            </p>
-            <p className="text-white/70 text-xs">
-              Automatique sous 5 jours • Accès {registrationFee}€
-            </p>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-5 w-48 bg-white/20 mb-2" />
+                <Skeleton className="h-3 w-32 bg-white/10" />
+              </>
+            ) : (
+              <>
+                <p className="text-white font-semibold text-base leading-tight mb-0.5">
+                  <span className="text-primary">{Math.max(0, registrationFee - 5)}€ remboursés</span> si aucun achat
+                </p>
+                <p className="text-white/70 text-xs">
+                  Automatique sous 5 jours • Accès {registrationFee}€
+                </p>
+              </>
+            )}
           </div>
         </motion.div>
 
@@ -295,9 +311,13 @@ export function Hero() {
                 </div>
               ))}
             </div>
-            <span suppressHydrationWarning className={`text-white font-semibold text-xs sm:text-sm transition-all duration-1000 inline-block ${isAnimating ? "text-primary scale-110 drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "scale-100"} ${isLoading ? "opacity-0" : "opacity-100"}`}>
-              {reservations}+ places réservées.
-            </span>
+            {isLoading ? (
+              <Skeleton className="h-5 w-32 bg-white/20 ml-2" />
+            ) : (
+              <span suppressHydrationWarning className={`text-white font-semibold text-xs sm:text-sm transition-all duration-1000 inline-block ml-2 ${isAnimating ? "text-primary scale-110 drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "scale-100"}`}>
+                {reservations}+ places réservées.
+              </span>
+            )}
           </div>
 
           <div className="hidden md:block w-px h-4 bg-white/20" />

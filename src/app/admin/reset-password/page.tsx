@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Logo } from "@/components/shared/Logo";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
@@ -81,11 +82,11 @@ export default function ResetPasswordPage() {
       />
       
       <Card className="w-full max-w-md z-10 border-border/50 bg-card/80 backdrop-blur-md shadow-2xl">
-        <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <KeyRound className="w-6 h-6 text-primary" />
+        <CardHeader className="space-y-4 text-center pb-8">
+          <div className="mx-auto flex justify-center mb-2">
+            <Logo className="scale-110" />
           </div>
-          <CardTitle className="font-heading text-3xl font-bold tracking-tight">Nouveau mot de passe</CardTitle>
+          <CardTitle className="font-heading text-2xl font-bold tracking-tight">Nouveau mot de passe</CardTitle>
           <CardDescription>
             Définissez un nouveau mot de passe pour votre compte administrateur.
           </CardDescription>

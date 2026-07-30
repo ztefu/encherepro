@@ -4,12 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Search, Filter, MoreVertical, Eye, Edit, CheckCircle, Mail, Trash2 } from "lucide-react";
+import { Search, Filter, MoreVertical, Eye, Edit, CheckCircle, Mail, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -183,7 +184,31 @@ export default function ParticipantsListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {paginatedParticipants.map((p) => (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-4" /></td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="w-8 h-8 rounded-full" />
+                          <div>
+                            <Skeleton className="h-4 w-32 mb-1" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-40 mb-1" />
+                        <Skeleton className="h-3 w-24" />
+                      </td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                      <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-8 ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : paginatedParticipants.map((p) => (
                   <tr key={p.id} className="hover:bg-muted/30 transition-colors" data-state={selectedParticipantIds.includes(p.id) ? "selected" : undefined}>
                     <td className="px-6 py-4">
                       <Checkbox 
@@ -247,10 +272,19 @@ export default function ParticipantsListPage() {
                     </td>
                   </tr>
                 ))}
-                {paginatedParticipants.length === 0 && (
+                {!isLoading && paginatedParticipants.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                      Aucune inscription trouvée.
+                    <td colSpan={8} className="px-6 py-16 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <Users className="w-12 h-12 text-muted-foreground/50 mb-4" />
+                        <h3 className="text-lg font-medium text-foreground">Aucun participant trouvé</h3>
+                        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                          Nous n'avons trouvé aucun participant correspondant à vos critères de recherche.
+                        </p>
+                        <Button variant="outline" className="mt-4" onClick={() => {setSearchTerm(""); setSelectedSaleId("all");}}>
+                          Réinitialiser les filtres
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 )}

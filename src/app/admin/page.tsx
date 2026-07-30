@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Euro, Gavel, CalendarCheck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -111,10 +112,14 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold font-heading">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.change}
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-8 w-24 mb-2" />
+              ) : (
+                <div className="text-2xl font-bold font-heading">{stat.value}</div>
+              )}
+              <div className="text-xs text-muted-foreground mt-1">
+                {isLoading ? <Skeleton className="h-3 w-32" /> : stat.change}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -139,35 +144,50 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {filteredRegistrations.slice(0, 5).map((reg) => (
-                  <tr key={reg.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 font-medium text-foreground">
-                      {reg.firstName} {reg.lastName}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-muted-foreground">{reg.email}</span>
-                        <span className="text-xs text-muted-foreground/70">{reg.phone}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-foreground">{reg.sale}</td>
-                    <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
-                      {format(new Date(reg.date), "dd/MM/yyyy", { locale: fr })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getPaymentBadge(reg.paymentStatus)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getParticipationBadge(reg.participationStatus)}
-                    </td>
-                  </tr>
-                ))}
-                {filteredRegistrations.length === 0 && (
+                {isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-32" /></td>
+                      <td className="px-6 py-4">
+                        <Skeleton className="h-4 w-40 mb-1" />
+                        <Skeleton className="h-3 w-24" />
+                      </td>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-24" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-20" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+                    </tr>
+                  ))
+                ) : filteredRegistrations.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                       Aucune inscription récente.
                     </td>
                   </tr>
+                ) : (
+                  filteredRegistrations.slice(0, 5).map((reg) => (
+                    <tr key={reg.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        {reg.firstName} {reg.lastName}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">{reg.email}</span>
+                          <span className="text-xs text-muted-foreground/70">{reg.phone}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-foreground">{reg.sale}</td>
+                      <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
+                        {format(new Date(reg.date), "dd/MM/yyyy", { locale: fr })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getPaymentBadge(reg.paymentStatus)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getParticipationBadge(reg.participationStatus)}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

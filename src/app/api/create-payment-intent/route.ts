@@ -8,7 +8,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(req: Request) {
   try {
-    const { saleId, email } = await req.json();
+    const body = await req.json();
+    const { saleId, email, firstName, lastName, phone, country, address, city, postalCode } = body;
 
     const supabase = await createClient();
 
@@ -29,6 +30,13 @@ export async function POST(req: Request) {
       metadata: {
         saleId,
         email,
+        firstName,
+        lastName,
+        phone,
+        country: country || "France",
+        address,
+        city,
+        postalCode,
       },
     });
 
