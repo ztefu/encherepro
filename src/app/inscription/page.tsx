@@ -9,6 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -102,6 +110,17 @@ export default function InscriptionPage() {
   const [postalCode, setPostalCode] = useState("");
   const [city, setCity] = useState("");
   
+  // Modal state for alerts
+  const [modalState, setModalState] = useState<{isOpen: boolean, title: string, message: string}>({
+    isOpen: false,
+    title: "",
+    message: ""
+  });
+
+  const showError = (title: string, message: string) => {
+    setModalState({ isOpen: true, title, message });
+  };
+  
   // Stripe state
   const [clientSecret, setClientSecret] = useState("");
 
@@ -121,7 +140,7 @@ export default function InscriptionPage() {
   const handleNextStep = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!termsAccepted) {
-      alert("Veuillez accepter les conditions générales.");
+      showError("Conditions Générales", "Veuillez accepter les conditions générales pour continuer.");
       return;
     }
 
@@ -135,7 +154,7 @@ export default function InscriptionPage() {
       .maybeSingle();
 
     if (existingParticipant) {
-      alert("Cette adresse email est déjà inscrite pour cette vente !");
+      showError("Inscription Refusée", "Cet Utilisateur est déjà inscrit pour cette vente.");
       setIsProcessing(false);
       return;
     }
@@ -162,13 +181,13 @@ export default function InscriptionPage() {
         setClientSecret(data.clientSecret);
         setStep(2);
       } else {
-        alert(data.error || "Erreur lors de l'initialisation du paiement.");
+        showError("Erreur", data.error || "Erreur lors de l'initialisation du paiement.");
       }
     } catch (err) {
-      alert("Erreur serveur de paiement.");
+       showError("Erreur serveur", "Erreur lors de la communication avec le serveur de paiement.");
+    } finally {
+      setIsProcessing(false);
     }
-    
-    setIsProcessing(false);
   };
 
   return (
@@ -408,6 +427,23 @@ export default function InscriptionPage() {
         </>
         )}
       </div>
+
+      {/* Custom Alert Modal */}
+      <Dialog open={modalState.isOpen} onOpenChange={(open) => setModalState(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="sm:max-w-md bg-card border-border/50">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl">{modalState.title}</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              {modalState.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end mt-4">
+            <Button type="button" onClick={() => setModalState(prev => ({ ...prev, isOpen: false }))}>
+              Compris
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

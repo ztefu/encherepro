@@ -13,6 +13,27 @@ export async function POST(req: Request) {
 
     const supabase = await createClient();
 
+    // 0. Check if participant already exists (using admin to bypass RLS)
+    const { createClient: createSupabaseAdmin } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseAdmin(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: existingParticipants } = await supabaseAdmin
+      .from('participants')
+      .select('id')
+      .ilike('email', email.trim())
+      .eq('sale_id', saleId)
+      .limit(1);
+
+    if (existingParticipants && existingParticipants.length > 0) {
+      return NextResponse.json(
+        { error: "Cet Utilisateur est déjà inscrit pour cette vente." },
+        { status: 400 }
+      );
+    }
+
     // 1. Fetch settings to get registration fee
     const { data: settings } = await supabase
       .from('settings')
