@@ -69,6 +69,13 @@ export async function POST(req: Request) {
         if (sale) {
           await supabaseAdmin.from('sales').update({ participants: (sale.participants || 0) + 1 }).eq('id', metadata.saleId);
           
+          // Insert a notification for the admin
+          await supabaseAdmin.from('notifications').insert({
+            title: "Nouvelle inscription",
+            message: `${metadata.firstName} ${metadata.lastName} s'est inscrit(e) à la vente "${sale.title}".`,
+            type: "success"
+          });
+          
           // Call the send-receipt API
           const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
           const hostHeader = (await headers()).get('host') || 'localhost:3000';

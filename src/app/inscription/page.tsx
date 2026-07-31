@@ -407,7 +407,7 @@ export default function InscriptionPage() {
               </h1>
               <div className="max-w-md mx-auto text-muted-foreground space-y-4">
                 <p>
-                  Félicitations, vos informations personnelles et votre paiement ont bien été enregistrés.
+                  Félicitations, vos informations de contact et votre paiement ont bien été enregistrés. Un e-mail de confirmation vous a été envoyé instantanément.
                 </p>
                 <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg text-foreground font-medium">
                   Nous vous contacterons par email ou téléphone au moment venu pour vous transmettre vos identifiants d'accès sécurisés à la salle de vente.

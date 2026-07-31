@@ -38,7 +38,7 @@ import { useAdmin } from "@/context/AdminContext";
 const generateSlug = (title: string) => title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 export default function ParticipantsListPage() {
-  const { sales, participants, updateParticipantPayment, updateParticipantAccess, deleteParticipant, deleteMultipleParticipants, isLoading } = useAdmin();
+  const { sales, participants, updateParticipantPayment, updateParticipantAccess, deleteParticipant, deleteMultipleParticipants, updateMultipleParticipantsAccess, isLoading } = useAdmin();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSaleId, setSelectedSaleId] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,6 +46,8 @@ export default function ParticipantsListPage() {
   
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<(string | number)[]>([]);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isSendingBulkAccess, setIsSendingBulkAccess] = useState(false);
+  const [resultModalMessage, setResultModalMessage] = useState<{title: string, description: string} | null>(null);
   const itemsPerPage = 12;
 
   const getPaymentBadge = (status: string) => {
@@ -103,6 +105,61 @@ export default function ParticipantsListPage() {
     setIsBulkDeleteModalOpen(false);
   };
 
+  const handleBulkSendAccess = async () => {
+    setIsSendingBulkAccess(true);
+    let successCount = 0;
+    
+    // Process selected participants sequentially
+    for (const pId of selectedParticipantIds) {
+      const participant = participants.find(p => p.id === pId);
+      if (!participant) continue;
+      
+      const sale = sales.find(s => String(s.id) === String(participant.saleId));
+      let formattedDate = "Date à venir";
+      if (sale && sale.isoDate) {
+        formattedDate = format(new Date(sale.isoDate), "EEEE d MMMM yyyy 'à' HH'h'mm", { locale: fr });
+        formattedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+      }
+
+      try {
+        const res = await fetch('/api/emails/send-ticket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: participant.email,
+            firstName: participant.firstName,
+            lastName: participant.lastName,
+            saleTitle: participant.sale,
+            saleDate: formattedDate,
+            saleLocation: sale?.location || "Adresse communiquée ultérieurement",
+          })
+        });
+        
+        if (res.ok) {
+          successCount++;
+        }
+      } catch (err) {
+        console.error("Failed to send email to", participant.email, err);
+      }
+    }
+    
+    if (successCount > 0) {
+      updateMultipleParticipantsAccess(selectedParticipantIds, "access_sent");
+      setResultModalMessage({
+        title: "Succès !",
+        description: `${successCount} billet(s) d'accès envoyé(s) avec succès.`
+      });
+      setSelectedParticipantIds([]);
+    } else {
+      setResultModalMessage({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'envoi des billets."
+      });
+    }
+    
+    setIsSendingBulkAccess(false);
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -116,9 +173,24 @@ export default function ParticipantsListPage() {
             <span className="text-sm font-medium">
               {selectedParticipantIds.length} inscrit{selectedParticipantIds.length > 1 ? "s" : ""} sélectionné{selectedParticipantIds.length > 1 ? "s" : ""}
             </span>
-            <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteModalOpen(true)}>
-              <Trash2 className="w-4 h-4 mr-2" /> Supprimer la sélection
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleBulkSendAccess}
+                disabled={isSendingBulkAccess}
+                className="text-blue-500 hover:text-blue-600 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10"
+              >
+                {isSendingBulkAccess ? (
+                  <span className="animate-pulse">Envoi en cours...</span>
+                ) : (
+                  <><Mail className="w-4 h-4 mr-2" /> Envoyer les accès</>
+                )}
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteModalOpen(true)}>
+                <Trash2 className="w-4 h-4 mr-2" /> Supprimer
+              </Button>
+            </div>
           </div>
         )}
         <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4">
@@ -357,6 +429,21 @@ export default function ParticipantsListPage() {
             <Button variant="destructive" onClick={handleBulkDelete}>
               Supprimer
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Result Modal Message */}
+      <Dialog open={!!resultModalMessage} onOpenChange={(open) => !open && setResultModalMessage(null)}>
+        <DialogContent className="sm:max-w-md bg-card border-border/50">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-xl">{resultModalMessage?.title}</DialogTitle>
+            <DialogDescription className="text-base pt-2">
+              {resultModalMessage?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end mt-4">
+            <Button onClick={() => setResultModalMessage(null)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

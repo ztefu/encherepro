@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { fr } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 
 export type SaleStatus = "En cours" | "À venir" | "Terminée" | "Brouillon" | "published" | "upcoming" | "open" | "draft" | "finished";
@@ -87,6 +89,7 @@ interface AdminContextProps {
   updateParticipantProfile: (id: string | number, updates: Partial<Participant>) => Promise<boolean>;
   deleteParticipant: (id: string | number) => Promise<void>;
   deleteMultipleParticipants: (ids: (string | number)[]) => Promise<void>;
+  updateMultipleParticipantsAccess: (ids: (string | number)[], status: Participant["participationStatus"]) => Promise<void>;
 
   lots: Lot[];
   setLots: React.Dispatch<React.SetStateAction<Lot[]>>;
@@ -143,6 +146,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, () => fetchData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lots' }, () => fetchData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => fetchData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => fetchData(false))
       .subscribe((status) => {
         console.log("Supabase Realtime Status:", status);
       });
@@ -212,6 +216,19 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user && user.email) {
       setAdminEmail(user.email);
+    }
+    
+    // Fetch Notifications
+    const { data: notifData } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    if (notifData) {
+      setNotifications(notifData.map(n => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        isRead: n.is_read,
+        type: n.type,
+        time: formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: fr })
+      })));
     }
     
     // Fetch Sales
@@ -458,6 +475,16 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateMultipleParticipantsAccess = async (ids: (string | number)[], status: Participant["participationStatus"]) => {
+    const { error } = await supabase.from('participants').update({ participation_status: status }).in('id', ids);
+    if (error) {
+      alert("Erreur lors de la mise à jour multiple.");
+      console.error(error);
+    } else {
+      setParticipants(prev => prev.map(p => ids.includes(p.id) ? { ...p, participationStatus: status } : p));
+    }
+  };
+
   const addLot = async (lot: Lot) => {
     const { data, error } = await supabase.from('lots').insert({
       sale_id: lot.saleId,
@@ -520,8 +547,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const markNotificationAsRead = (id: string) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  const markAllNotificationsAsRead = () => setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const markNotificationAsRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  };
+  
+  const markAllNotificationsAsRead = async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    await supabase.from('notifications').update({ is_read: true }).eq('is_read', false);
+  };
 
   const unreadNotificationsCount = notifications.filter(n => !n.isRead).length;
 
@@ -548,7 +582,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   return (
     <AdminContext.Provider value={{
       sales, addSale, updateSale, deleteSale, deleteMultipleSales, duplicateSale,
-      participants, updateParticipantPayment, updateParticipantAccess, updateParticipantProfile, deleteParticipant, deleteMultipleParticipants,
+      participants, updateParticipantPayment,
+    updateParticipantAccess,
+    updateParticipantProfile,
+    deleteParticipant,
+    deleteMultipleParticipants,
+    updateMultipleParticipantsAccess,
       lots, setLots: setLotsState, addLot, updateLot, deleteLot, reorderLots,
       notifications, markNotificationAsRead, markAllNotificationsAsRead, unreadNotificationsCount,
       selectedSaleId, setSelectedSaleId, dashboardStats,
