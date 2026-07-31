@@ -1,15 +1,68 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { z } from 'zod';
+import { createClient } from '@/lib/supabase/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { escapeHtml } from '@/lib/sanitize';
+import { getServerEnv } from '@/lib/env';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Input validation schema (Correction #4)
+const sendReceiptSchema = z.object({
+  email: z.string().email().max(255),
+  firstName: z.string().max(100).optional().default(''),
+  lastName: z.string().max(100).optional().default(''),
+  saleTitle: z.string().min(1).max(300),
+  amount: z.number().positive().max(100000),
+});
 
 export async function POST(req: Request) {
-  try {
-    const { email, firstName, lastName, saleTitle, amount } = await req.json();
+  const serverEnv = getServerEnv();
+  const resend = new Resend(serverEnv.RESEND_API_KEY);
 
-    if (!email || !saleTitle) {
-      return NextResponse.json({ error: 'Email and saleTitle are required' }, { status: 400 });
+  // Rate limiting: 10 requests per minute per IP (Correction #8)
+  const ip = getClientIp(req);
+  const { success } = rateLimit(ip, {
+    maxRequests: 10,
+    windowMs: 60 * 1000,
+  });
+
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes.' },
+      { status: 429 }
+    );
+  }
+
+  // Authentication check (Correction #3)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Allow calls from authenticated admin OR from internal server calls (webhook)
+  // For internal calls, check for a shared internal header
+  const isInternalCall = req.headers.get('x-internal-secret') === serverEnv.STRIPE_WEBHOOK_SECRET;
+
+  if (!user && !isInternalCall) {
+    return NextResponse.json(
+      { error: 'Non autorisé.' },
+      { status: 401 }
+    );
+  }
+
+  try {
+    // Input validation (Correction #4)
+    const body = await req.json();
+    const result = sendReceiptSchema.safeParse(body);
+
+    if (!result.success) {
+      return NextResponse.json({ error: 'Données invalides.' }, { status: 400 });
     }
+
+    const { email, firstName, lastName, saleTitle, amount } = result.data;
+
+    // Escape all user-provided content before injecting into HTML (Correction #5)
+    const safeFirstName = escapeHtml(firstName);
+    const safeLastName = escapeHtml(lastName);
+    const safeSaleTitle = escapeHtml(saleTitle);
 
     const htmlContent = `
       <div style="font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #09090b; color: #fafafa; border: 1px solid #27272a; border-radius: 12px;">
@@ -27,12 +80,12 @@ export async function POST(req: Request) {
         <!-- Receipt Content -->
         <div style="background-color: #09090b; padding: 32px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
           <p style="font-size: 16px; color: #e4e4e7; margin-top: 0; margin-bottom: 24px;">
-            Bonjour <span style="font-weight: 600; color: #fff;">${firstName || ''} ${lastName || ''}</span>,
+            Bonjour <span style="font-weight: 600; color: #fff;">${safeFirstName} ${safeLastName}</span>,
           </p>
           
           <p style="font-size: 15px; color: #a1a1aa; margin-bottom: 32px; line-height: 1.6;">
             Nous confirmons la réception de votre paiement de <strong style="color: #ffffff;">${amount} €</strong> pour les frais de dossier de la vente privée :<br>
-            <strong style="color: #ffffff; display: block; margin-top: 12px; font-size: 18px; letter-spacing: -0.5px;">${saleTitle}</strong>
+            <strong style="color: #ffffff; display: block; margin-top: 12px; font-size: 18px; letter-spacing: -0.5px;">${safeSaleTitle}</strong>
           </p>
           
           <div style="background-color: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 8px; border: 1px dashed rgba(255, 255, 255, 0.1); margin-bottom: 32px;">
@@ -73,13 +126,14 @@ export async function POST(req: Request) {
     const data = await resend.emails.send({
       from: 'onboarding@resend.dev', // Une fois votre domaine validé, mettez 'EnchèrePro <contact@votre-domaine.com>'
       to: email,
-      subject: `Reçu de paiement - Inscription à la vente ${saleTitle}`,
+      subject: `Reçu de paiement - Inscription à la vente ${safeSaleTitle}`,
       html: htmlContent,
     });
 
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error sending receipt email:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    // Generic error message (Correction #6)
+    return NextResponse.json({ error: 'Erreur lors de l\'envoi de l\'email.' }, { status: 500 });
   }
 }

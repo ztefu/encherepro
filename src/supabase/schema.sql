@@ -60,12 +60,13 @@ CREATE POLICY "Public can view published sales" ON public.sales FOR SELECT USING
 CREATE POLICY "Public can view lots of published sales" ON public.lots FOR SELECT USING (EXISTS (SELECT 1 FROM public.sales WHERE sales.id = lots.sale_id AND sales.status IN ('À venir', 'En cours', 'published', 'upcoming', 'open')));
 
 -- 4. Policy for participants to insert themselves
-CREATE POLICY "Public can insert participants" ON public.participants FOR INSERT WITH CHECK (true);
+-- REMOVED: Public insert is disabled. Webhook uses service_role key to bypass RLS.
+-- CREATE POLICY "Public can insert participants" ON public.participants FOR INSERT WITH CHECK (true);
 
 -- 5. Authenticated users (Admin) can do everything
-CREATE POLICY "Admin full access sales" ON public.sales FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Admin full access lots" ON public.lots FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Admin full access participants" ON public.participants FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin full access sales" ON public.sales FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Admin full access lots" ON public.lots FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Admin full access participants" ON public.participants FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
 -- 6. Settings table and policies
 CREATE TABLE IF NOT EXISTS public.settings (
@@ -79,4 +80,4 @@ CREATE TABLE IF NOT EXISTS public.settings (
 
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public can view settings" ON public.settings FOR SELECT USING (true);
-CREATE POLICY "Admin full access settings" ON public.settings FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin full access settings" ON public.settings FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');

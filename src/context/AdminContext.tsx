@@ -147,9 +147,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lots' }, () => fetchData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => fetchData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => fetchData(false))
-      .subscribe((status) => {
-        console.log("Supabase Realtime Status:", status);
-      });
+      .subscribe();
 
     // Auth state listener to keep email in sync
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -169,7 +167,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const updateSettings = async (updates: any) => {
     // We use upsert to ensure the row exists if it was somehow deleted
     const { error } = await supabase.from('settings').upsert({ id: 1, ...updates });
-    if (error) console.error("Error updating settings:", error);
+    if (error) console.error("Erreur lors de la mise à jour des paramètres.");
   };
 
   const setAdminAvatar = async (url: string | null) => {
@@ -423,7 +421,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('participants').update({ payment_status: status }).eq('id', id);
     if (error) {
       alert("Erreur lors de la mise à jour. Avez-vous désactivé la sécurité RLS dans Supabase ?");
-      console.error(error);
+      console.error("Erreur de mise à jour du statut de paiement.");
     } else {
       setParticipants(prev => prev.map(p => p.id === id ? { ...p, paymentStatus: status } : p));
     }
@@ -433,7 +431,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('participants').update({ participation_status: status }).eq('id', id);
     if (error) {
       alert("Erreur lors de la mise à jour. Avez-vous désactivé la sécurité RLS dans Supabase ?");
-      console.error(error);
+      console.error("Erreur de mise à jour de l'accès.");
     } else {
       setParticipants(prev => prev.map(p => p.id === id ? { ...p, participationStatus: status } : p));
     }
@@ -453,7 +451,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('participants').update(dbUpdates).eq('id', id);
     if (error) {
       alert("Erreur lors de la mise à jour. Avez-vous désactivé la sécurité RLS dans Supabase ?");
-      console.error(error);
+      console.error("Erreur lors de la mise à jour du profil.");
       return false;
     } else {
       setParticipants(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
@@ -479,7 +477,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('participants').update({ participation_status: status }).in('id', ids);
     if (error) {
       alert("Erreur lors de la mise à jour multiple.");
-      console.error(error);
+      console.error("Erreur lors de la mise à jour multiple.");
     } else {
       setParticipants(prev => prev.map(p => ids.includes(p.id) ? { ...p, participationStatus: status } : p));
     }

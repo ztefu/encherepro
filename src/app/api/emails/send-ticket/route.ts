@@ -1,18 +1,70 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { z } from 'zod';
+import { createClient } from '@/lib/supabase/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { escapeHtml } from '@/lib/sanitize';
+import { getServerEnv } from '@/lib/env';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Input validation schema (Correction #4)
+const sendTicketSchema = z.object({
+  email: z.string().email().max(255),
+  firstName: z.string().max(100).optional().default(''),
+  lastName: z.string().max(100).optional().default(''),
+  saleTitle: z.string().min(1).max(300),
+  saleDate: z.string().max(200).optional().default('Date à venir'),
+  saleLocation: z.string().max(300).optional().default('Adresse communiquée ultérieurement'),
+});
 
 export async function POST(req: Request) {
-  try {
-    const { email, firstName, lastName, saleTitle, saleDate, saleLocation } = await req.json();
+  const serverEnv = getServerEnv();
+  const resend = new Resend(serverEnv.RESEND_API_KEY);
 
-    if (!email || !saleTitle) {
-      return NextResponse.json({ error: 'Email and saleTitle are required' }, { status: 400 });
+  // Rate limiting: 10 requests per minute per IP (Correction #8)
+  const ip = getClientIp(req);
+  const { success } = rateLimit(ip, {
+    maxRequests: 10,
+    windowMs: 60 * 1000,
+  });
+
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Trop de requêtes.' },
+      { status: 429 }
+    );
+  }
+
+  // Authentication check — only admins can send tickets (Correction #3)
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Non autorisé.' },
+      { status: 401 }
+    );
+  }
+
+  try {
+    // Input validation (Correction #4)
+    const body = await req.json();
+    const result = sendTicketSchema.safeParse(body);
+
+    if (!result.success) {
+      return NextResponse.json({ error: 'Données invalides.' }, { status: 400 });
     }
+
+    const { email, firstName, lastName, saleTitle, saleDate, saleLocation } = result.data;
 
     // Generate a random ticket number
     const ticketNumber = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+    // Escape all user-provided content before injecting into HTML (Correction #5)
+    const safeFirstName = escapeHtml(firstName);
+    const safeLastName = escapeHtml(lastName);
+    const safeSaleTitle = escapeHtml(saleTitle);
+    const safeSaleDate = escapeHtml(saleDate);
+    const safeSaleLocation = escapeHtml(saleLocation);
 
     const htmlContent = `
       <div style="font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #09090b; color: #fafafa; border: 1px solid #27272a; border-radius: 12px;">
@@ -35,7 +87,7 @@ export async function POST(req: Request) {
               Billet d'Accès Officiel
             </div>
             <h2 style="font-size: 24px; font-weight: 700; margin: 0; color: #ffffff; letter-spacing: -0.5px;">
-              ${saleTitle}
+              ${safeSaleTitle}
             </h2>
           </div>
           
@@ -46,7 +98,7 @@ export async function POST(req: Request) {
                 <span style="color: #a1a1aa; font-size: 13px; font-weight: 500;">Participant</span>
               </td>
               <td style="padding: 16px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); text-align: right;">
-                <span style="font-weight: 600; font-size: 15px; color: #ffffff;">${firstName || ''} ${lastName || ''}</span>
+                <span style="font-weight: 600; font-size: 15px; color: #ffffff;">${safeFirstName} ${safeLastName}</span>
               </td>
             </tr>
             <tr>
@@ -54,7 +106,7 @@ export async function POST(req: Request) {
                 <span style="color: #a1a1aa; font-size: 13px; font-weight: 500;">Date</span>
               </td>
               <td style="padding: 16px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); text-align: right;">
-                <span style="font-weight: 600; font-size: 15px; color: #ffffff;">${saleDate || 'Date à venir'}</span>
+                <span style="font-weight: 600; font-size: 15px; color: #ffffff;">${safeSaleDate}</span>
               </td>
             </tr>
             <tr>
@@ -62,7 +114,7 @@ export async function POST(req: Request) {
                 <span style="color: #a1a1aa; font-size: 13px; font-weight: 500;">Lieu</span>
               </td>
               <td style="padding: 16px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); text-align: right;">
-                <span style="font-weight: 600; font-size: 15px; color: #ffffff;">${saleLocation || 'Adresse communiquée ultérieurement'}</span>
+                <span style="font-weight: 600; font-size: 15px; color: #ffffff;">${safeSaleLocation}</span>
               </td>
             </tr>
           </table>
@@ -91,13 +143,14 @@ export async function POST(req: Request) {
     const data = await resend.emails.send({
       from: 'onboarding@resend.dev', // Une fois votre domaine validé, mettez 'EnchèrePro <contact@votre-domaine.com>'
       to: email,
-      subject: `Votre Billet d'Accès - ${saleTitle}`,
+      subject: `Votre Billet d'Accès - ${safeSaleTitle}`,
       html: htmlContent,
     });
 
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error sending ticket email:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    // Generic error message (Correction #6)
+    return NextResponse.json({ error: 'Erreur lors de l\'envoi du billet.' }, { status: 500 });
   }
 }
