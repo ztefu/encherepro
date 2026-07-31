@@ -100,6 +100,7 @@ export default function InscriptionPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [phoneInput, setPhoneInput] = useState<string | undefined>("");
+  const [countryCode, setCountryCode] = useState<string>("FR");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Form states
@@ -170,7 +171,7 @@ export default function InscriptionPage() {
           firstName,
           lastName,
           phone: phoneInput,
-          country: "France", // Mettre à jour avec un champ pays si ajouté plus tard
+          country: countryCode ? new Intl.DisplayNames(['fr'], { type: 'region' }).of(countryCode) : "France",
           address,
           city,
           postalCode
@@ -301,6 +302,7 @@ export default function InscriptionPage() {
                     withCountryCallingCode
                     value={phoneInput}
                     onChange={setPhoneInput}
+                    onCountryChange={(code) => setCountryCode(code || 'FR')}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring focus-within:outline-none"
                     numberInputProps={{
                       className: "flex-1 border-none shadow-none focus-visible:ring-0 rounded-none bg-transparent ml-2 outline-none",
